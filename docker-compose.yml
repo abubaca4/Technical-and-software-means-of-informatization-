@@ -1,0 +1,73 @@
+version: '3.6'
+services:
+  s3:
+    restart: always
+    image: minio/minio:latest
+    container_name: images_s3
+    volumes:
+      - images_data:/data
+    environment:
+      MINIO_ACCESS_KEY: SAMPLE_MINIO_ACCESS_KEY
+      MINIO_SECRET_KEY: SAMPLE_MINIO_SECRET_KEY
+    command: server /data --console-address ":9001"
+  postgres:
+    restart: always
+    image: postgres:alpine
+    container_name: images_postgres
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: SAMPLE_DB_PASSWORD
+    volumes:
+      - ./config/pg-setup.sql:/docker-entrypoint-initdb.d/pg-setup.sql
+      - dbdata:/var/lib/postgresql/data
+  django:
+    restart: always
+    container_name: django
+    volumes:
+      - ./code:/code
+    build:
+      context: .
+      dockerfile: dockerfiles/docker_django.conf
+    depends_on:
+      - postgres
+      - s3
+    environment:
+      DJANGO_SUPERUSER_USERNAME: admin
+      DJANGO_SUPERUSER_PASSWORD: SAMPLE_ADMIN_PASSWORD
+      DJANGO_SUPERUSER_EMAIL: admin@example.com
+      AWS_ACCESS_KEY_ID: SAMPLE_MINIO_ACCESS_KEY
+      AWS_SECRET_ACCESS_KEY: SAMPLE_MINIO_SECRET_KEY
+      AWS_STORAGE_BUCKET_NAME: images
+      AWS_S3_ENDPOINT_URL: minio.host.link
+      DB_USER: admin
+      DB_PASSWORD: SAMPLE_DB_PASSWORD
+    command: uwsgi --ini /etc/uwsgi.ini
+  nginx:
+    image: umputun/nginx-le:master
+    restart: always
+    container_name: nginx
+    volumes:
+      - ./code:/code
+      - ./config/uwsgi_params:/etc/nginx/uwsgi_params
+      - ./config/django.conf:/etc/nginx/service.conf
+      - ./config/minio.conf:/etc/nginx/service2.conf
+      - nginx-ssl:/etc/nginx/ssl
+    depends_on:
+      - django
+      - s3
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      TZ: 'Europe/Moscow'
+      LETSENCRYPT: 'true'
+      LE_EMAIL: 'admin@example.com,admin@example.com'
+      LE_FQDN: 'site.host.link,minio.host.link'
+
+volumes:
+  images_data:
+    driver: local
+  dbdata:
+    driver: local
+  nginx-ssl:
+    driver: local
