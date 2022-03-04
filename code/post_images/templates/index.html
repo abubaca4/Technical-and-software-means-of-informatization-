@@ -16,7 +16,7 @@
                 data-bs-interval="false">
                 <div class="carousel-inner">{% for image in item.images.all %}
                     <div class="carousel-item{% if forloop.first %} active{% endif %}">
-                        <img src="{{ image.picture.url }}" class="d-block" alt=""
+                        <img src="{% url 'image_link' image.id %}" class="d-block" alt=""
                             style="margin:auto; height:40vh; width:auto; display:block; max-width:100vw">
                     </div>{% endfor %}
                 </div>
